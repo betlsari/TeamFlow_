@@ -4,10 +4,16 @@ const Task = {
   async findById(id) {
     const result = await pool.query(
       `SELECT t.*,
-              json_agg(DISTINCT jsonb_build_object('id', u.id, 'username', u.username, 'full_name', u.full_name))
-                FILTER (WHERE u.id IS NOT NULL) AS assignees,
-              json_agg(DISTINCT jsonb_build_object('id', l.id, 'name', l.name, 'color', l.color))
-                FILTER (WHERE l.id IS NOT NULL) AS labels
+              COALESCE(
+                json_agg(DISTINCT jsonb_build_object('id', u.id, 'username', u.username, 'full_name', u.full_name))
+                FILTER (WHERE u.id IS NOT NULL),
+                '[]'::json
+              ) AS assignees,
+              COALESCE(
+                json_agg(DISTINCT jsonb_build_object('id', l.id, 'name', l.name, 'color', l.color))
+                FILTER (WHERE l.id IS NOT NULL),
+                '[]'::json
+              ) AS labels
        FROM tasks t
        LEFT JOIN task_assignees ta ON ta.task_id = t.id
        LEFT JOIN users u ON u.id = ta.user_id
