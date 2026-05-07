@@ -4,6 +4,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
+const passport = require("./src/config/passport"); // ✅ EKLENDİ
 const authRoutes = require("./src/routes/authRoutes");
 const errorHandler = require("./src/middleware/errorHandler");
 const requestLogger = require("./src/middleware/requestLogger");
@@ -16,6 +17,9 @@ const corsOptions = require("./src/config/cors");
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Passport başlatma ✅ EKLENDİ
+app.use(passport.initialize());
 
 // Loglama
 app.use(requestLogger);
