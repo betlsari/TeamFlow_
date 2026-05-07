@@ -12,7 +12,8 @@ const app = express();
 
 // Güvenlik
 app.use(helmet());
-app.use(cors());
+const corsOptions = require("./src/config/cors");
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
