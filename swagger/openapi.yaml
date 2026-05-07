@@ -25,6 +25,16 @@ tags:
     description: Kimlik doğrulama işlemleri
   - name: Notifications
     description: Bildirim yönetimi
+  - name: Projects
+    description: Proje CRUD ve üye yönetimi (Kişi B)
+  - name: Tasks
+    description: Görev CRUD, atama ve durum yönetimi (Kişi B)
+  - name: Labels
+    description: Etiket yönetimi (Kişi B)
+  - name: Sprints
+    description: Sprint yönetimi (Kişi C)
+  - name: Comments
+    description: Yorum sistemi (Kişi C)
 
 components:
   securitySchemes:
@@ -59,6 +69,180 @@ components:
           type: string
           format: date-time
 
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: "TeamFlow MVP"
+        description:
+          type: string
+          nullable: true
+        owner_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, archived, completed]
+          example: active
+        created_at:
+          type: string
+          format: date-time
+
+    ProjectMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        full_name:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [owner, contributor, viewer]
+        joined_at:
+          type: string
+          format: date-time
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        sprint_id:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+          example: "Login sayfası yap"
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+          example: todo
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+          example: medium
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Label"
+        created_at:
+          type: string
+          format: date-time
+
+    Label:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "bug"
+        color:
+          type: string
+          example: "#EF4444"
+        created_at:
+          type: string
+          format: date-time
+
+    Sprint:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Sprint 1"
+        goal:
+          type: string
+          nullable: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [planning, active, completed]
+          example: planning
+        created_at:
+          type: string
+          format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        content:
+          type: string
+        username:
+          type: string
+        full_name:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        created_at:
+          type: string
+          format: date-time
+
     Notification:
       type: object
       properties:
@@ -81,6 +265,22 @@ components:
         created_at:
           type: string
           format: date-time
+
+    ProjectStatistics:
+      type: object
+      properties:
+        total_tasks:
+          type: integer
+          example: 24
+        completed_tasks:
+          type: integer
+          example: 10
+        in_progress_tasks:
+          type: integer
+          example: 6
+        todo_tasks:
+          type: integer
+          example: 8
 
     SuccessResponse:
       type: object
@@ -309,7 +509,6 @@ paths:
     put:
       tags: [Auth]
       summary: Profil güncelleme
-      description: Kullanıcının ad-soyad veya avatar URL'ini günceller.
       security:
         - bearerAuth: []
       requestBody:
@@ -470,6 +669,1100 @@ paths:
         "401":
           description: Yetkisiz
 
+  # ─────────────────────────────────────────────
+  # PROJECTS  (Kişi B tarafından doldurulacak)
+  # ─────────────────────────────────────────────
+  /api/projects:
+    post:
+      tags: [Projects]
+      summary: Yeni proje oluştur
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  maxLength: 150
+                  example: "TeamFlow MVP"
+                description:
+                  type: string
+                  maxLength: 1000
+                  example: "Mini Jira benzeri proje yönetim aracı"
+      responses:
+        "201":
+          description: Proje oluşturuldu
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Project"
+        "400":
+          description: Validasyon hatası
+        "401":
+          description: Yetkisiz
+    get:
+      tags: [Projects]
+      summary: Kullanıcının projelerini listele
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Proje listesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Project"
+        "401":
+          description: Yetkisiz
+
+  /api/projects/{id}:
+    get:
+      tags: [Projects]
+      summary: Proje detayı
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Proje detayı
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Project"
+        "403":
+          description: Erişim yetkisi yok
+        "404":
+          description: Proje bulunamadı
+    put:
+      tags: [Projects]
+      summary: Proje güncelle (sadece owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 150
+                description:
+                  type: string
+                  maxLength: 1000
+                status:
+                  type: string
+                  enum: [active, archived, completed]
+      responses:
+        "200":
+          description: Proje güncellendi
+        "403":
+          description: Sadece owner güncelleyebilir
+        "404":
+          description: Proje bulunamadı
+    delete:
+      tags: [Projects]
+      summary: Proje sil (sadece owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Proje silindi
+        "403":
+          description: Sadece owner silebilir
+        "404":
+          description: Proje bulunamadı
+
+  /api/projects/{id}/members:
+    get:
+      tags: [Projects]
+      summary: Proje üyelerini listele
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Üye listesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ProjectMember"
+        "403":
+          description: Erişim yetkisi yok
+    post:
+      tags: [Projects]
+      summary: Projeye üye ekle (owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [owner, contributor, viewer]
+                  default: viewer
+      responses:
+        "201":
+          description: Üye eklendi
+        "403":
+          description: Sadece owner üye ekleyebilir
+        "404":
+          description: Kullanıcı bulunamadı
+
+  /api/projects/{id}/members/{userId}:
+    delete:
+      tags: [Projects]
+      summary: Üyeyi projeden çıkar (owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Üye çıkarıldı
+        "403":
+          description: Sadece owner üye çıkarabilir
+
+  /api/projects/{id}/statistics:
+    get:
+      tags: [Projects]
+      summary: Proje istatistikleri
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: İstatistikler
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ProjectStatistics"
+
+  /api/projects/{id}/activities:
+    get:
+      tags: [Projects]
+      summary: Proje aktivite akışı
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Aktivite listesi
+        "403":
+          description: Erişim yetkisi yok
+
+  # ─────────────────────────────────────────────
+  # TASKS  (Kişi B tarafından doldurulacak)
+  # ─────────────────────────────────────────────
+  /api/projects/{id}/tasks:
+    post:
+      tags: [Tasks]
+      summary: Görev oluştur
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Proje ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  maxLength: 255
+                  example: "Login sayfası tasarımı"
+                description:
+                  type: string
+                  maxLength: 2000
+                status:
+                  type: string
+                  enum: [todo, in_progress, done]
+                  default: todo
+                priority:
+                  type: string
+                  enum: [low, medium, high, critical]
+                  default: medium
+                due_date:
+                  type: string
+                  format: date
+                  example: "2026-05-21"
+                sprint_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "201":
+          description: Görev oluşturuldu
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Task"
+        "400":
+          description: Validasyon hatası
+        "403":
+          description: Yetki yok (viewer görev oluşturamaz)
+    get:
+      tags: [Tasks]
+      summary: Proje görevlerini listele
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [todo, in_progress, done]
+        - in: query
+          name: sprint_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: assignee_id
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Görev listesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Task"
+
+  /api/tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Görev detayı (atananlar + etiketler dahil)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Görev detayı
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Task"
+        "404":
+          description: Görev bulunamadı
+    put:
+      tags: [Tasks]
+      summary: Görev güncelle
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 255
+                description:
+                  type: string
+                  maxLength: 2000
+                status:
+                  type: string
+                  enum: [todo, in_progress, done]
+                priority:
+                  type: string
+                  enum: [low, medium, high, critical]
+                due_date:
+                  type: string
+                  format: date
+                  nullable: true
+                sprint_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "200":
+          description: Görev güncellendi
+        "403":
+          description: Yetki yok
+        "404":
+          description: Görev bulunamadı
+    delete:
+      tags: [Tasks]
+      summary: Görev sil
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Görev silindi
+        "403":
+          description: Yetki yok
+        "404":
+          description: Görev bulunamadı
+
+  /api/tasks/{id}/status:
+    patch:
+      tags: [Tasks]
+      summary: Görev durumunu değiştir (Kanban)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [todo, in_progress, done]
+                  example: in_progress
+      responses:
+        "200":
+          description: Durum güncellendi
+        "400":
+          description: Geçersiz durum
+        "403":
+          description: Yetki yok
+
+  /api/tasks/{id}/assignees:
+    get:
+      tags: [Tasks]
+      summary: Göreve atanan kullanıcıları listele
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Atanan kullanıcılar
+    post:
+      tags: [Tasks]
+      summary: Göreve kullanıcı ata
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Kullanıcı atandı
+        "403":
+          description: Yetki yok
+
+  /api/tasks/{id}/assignees/{userId}:
+    delete:
+      tags: [Tasks]
+      summary: Atamayı kaldır
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Atama kaldırıldı
+        "403":
+          description: Yetki yok
+
+  # ─────────────────────────────────────────────
+  # LABELS  (Kişi B tarafından doldurulacak)
+  # ─────────────────────────────────────────────
+  /api/projects/{id}/labels:
+    get:
+      tags: [Labels]
+      summary: Proje etiketlerini listele
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Etiket listesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Label"
+    post:
+      tags: [Labels]
+      summary: Yeni etiket oluştur
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 50
+                  example: "bug"
+                color:
+                  type: string
+                  pattern: "^#[0-9A-Fa-f]{6}$"
+                  example: "#EF4444"
+      responses:
+        "201":
+          description: Etiket oluşturuldu
+        "400":
+          description: Validasyon hatası veya etiket adı zaten mevcut
+
+  /api/labels/{id}:
+    delete:
+      tags: [Labels]
+      summary: Etiketi sil
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Etiket silindi
+        "403":
+          description: Yetki yok
+
+  /api/tasks/{id}/labels:
+    post:
+      tags: [Labels]
+      summary: Göreve etiket ekle
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label_id]
+              properties:
+                label_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Etiket eklendi
+        "403":
+          description: Yetki yok
+
+  /api/tasks/{id}/labels/{labelId}:
+    delete:
+      tags: [Labels]
+      summary: Görevden etiket kaldır
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: labelId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Etiket kaldırıldı
+        "403":
+          description: Yetki yok
+
+  # ─────────────────────────────────────────────
+  # SPRINTS  (Kişi C tarafından doldurulacak)
+  # ─────────────────────────────────────────────
+  /api/projects/{id}/sprints:
+    post:
+      tags: [Sprints]
+      summary: Sprint oluştur
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  example: "Sprint 1"
+                goal:
+                  type: string
+                  maxLength: 500
+                  example: "Auth ve temel görev yönetimini bitir"
+                start_date:
+                  type: string
+                  format: date
+                  example: "2026-05-07"
+                end_date:
+                  type: string
+                  format: date
+                  example: "2026-05-21"
+      responses:
+        "201":
+          description: Sprint oluşturuldu
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Sprint"
+        "400":
+          description: Validasyon hatası
+        "403":
+          description: Yetki yok
+    get:
+      tags: [Sprints]
+      summary: Sprint listesi
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Sprint listesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Sprint"
+
+  /api/sprints/{id}:
+    get:
+      tags: [Sprints]
+      summary: Sprint detayı
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Sprint detayı
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Sprint"
+        "404":
+          description: Sprint bulunamadı
+    put:
+      tags: [Sprints]
+      summary: Sprint güncelle
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                goal:
+                  type: string
+                  maxLength: 500
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: Sprint güncellendi
+        "403":
+          description: Yetki yok
+
+  /api/sprints/{id}/start:
+    patch:
+      tags: [Sprints]
+      summary: Sprint'i başlat (status → active)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Sprint başlatıldı
+        "400":
+          description: Sprint zaten aktif veya tamamlanmış
+        "403":
+          description: Yetki yok
+
+  /api/sprints/{id}/end:
+    patch:
+      tags: [Sprints]
+      summary: Sprint'i bitir — tamamlanmayan görevler backlog'a döner
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Sprint tamamlandı
+        "403":
+          description: Yetki yok
+
+  /api/sprints/{id}/tasks/{taskId}:
+    post:
+      tags: [Sprints]
+      summary: Görevi sprint'e ekle
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Görev sprint'e eklendi
+        "403":
+          description: Yetki yok
+    delete:
+      tags: [Sprints]
+      summary: Görevi sprint'ten çıkar
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Görev sprint'ten çıkarıldı
+        "403":
+          description: Yetki yok
+
+  # ─────────────────────────────────────────────
+  # COMMENTS  (Kişi C tarafından doldurulacak)
+  # ─────────────────────────────────────────────
+  /api/tasks/{id}/comments:
+    post:
+      tags: [Comments]
+      summary: Yorum ekle
+      description: |
+        `parent_id` verilirse reply (iç içe yorum), verilmezse root comment olur.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Görev ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  maxLength: 2000
+                  example: "Bu görev öncelikli olarak ele alınmalı."
+                parent_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Reply için üst yorum ID
+      responses:
+        "201":
+          description: Yorum eklendi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Comment"
+        "400":
+          description: Validasyon hatası
+        "403":
+          description: Yetki yok (viewer yorum yapabilir, sadece viewer'a izin verilecekse güncelle)
+    get:
+      tags: [Comments]
+      summary: Görev yorumlarını listele (iç içe ağaç yapısı)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Yorumlar (replies iç içe)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Comment"
+
+  /api/comments/{id}:
+    put:
+      tags: [Comments]
+      summary: Yorum güncelle (sadece yazar)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  maxLength: 2000
+      responses:
+        "200":
+          description: Yorum güncellendi
+        "403":
+          description: Sadece yorum sahibi güncelleyebilir
+        "404":
+          description: Yorum bulunamadı
+    delete:
+      tags: [Comments]
+      summary: Yorum sil (yazar veya proje owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Yorum silindi
+        "403":
+          description: Yetki yok
+        "404":
+          description: Yorum bulunamadı
+
+  # ─────────────────────────────────────────────
+  # HEALTH
+  # ─────────────────────────────────────────────
   /health:
     get:
       tags: [Auth]

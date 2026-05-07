@@ -35,7 +35,7 @@ const authLimiter = rateLimit({
 
 // Route'lar
 app.use("/api/auth", authLimiter, authRoutes);
-app.use("/api/notifications", notificationRoutes);
+app.use("/api/notifications", notificationRoutes); // Auth middleware router içinde tanımlı
 app.use("/api/docs", docsRoutes);
 
 // Sağlık kontrolü
