@@ -1,0 +1,43 @@
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+require("dotenv").config();
+
+const authRoutes = require("./src/routes/authRoutes");
+const errorHandler = require("./src/middleware/errorHandler");
+const requestLogger = require("./src/middleware/requestLogger");
+
+const app = express();
+
+// Güvenlik
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Loglama
+app.use(requestLogger);
+
+// Rate limiting (auth endpoint'leri için)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 20,
+  message: { success: false, message: "Çok fazla istek, lütfen bekleyin" },
+});
+
+// Route'lar
+app.use("/api/auth", authLimiter, authRoutes);
+
+// Sağlık kontrolü
+app.get("/health", (req, res) => {
+  res.json({ success: true, message: "Sunucu çalışıyor" });
+});
+
+// Global hata yakalama
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
+});
