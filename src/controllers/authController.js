@@ -1,4 +1,5 @@
-const pool = require("../config/database");
+const User = require("../models/User");
+const RefreshToken = require("../models/RefreshToken");
 const { hashPassword, comparePassword } = require("../utils/passwordHelper");
 const {
   generateAccessToken,
@@ -18,12 +19,8 @@ const register = async (req, res, next) => {
 
     const { username, email, password, full_name } = req.body;
 
-    const existingUser = await pool.query(
-      "SELECT id FROM users WHERE email = $1 OR username = $2",
-      [email, username],
-    );
-
-    if (existingUser.rows.length > 0) {
+    const exists = await User.existsByEmailOrUsername(email, username);
+    if (exists) {
       return sendError(
         res,
         "Bu e-posta veya kullanıcı adı zaten kullanılıyor",
@@ -32,25 +29,24 @@ const register = async (req, res, next) => {
     }
 
     const password_hash = await hashPassword(password);
+    const user = await User.create({
+      username,
+      email,
+      password_hash,
+      full_name,
+    });
 
-    const result = await pool.query(
-      `INSERT INTO users (username, email, password_hash, full_name)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, username, email, full_name, created_at`,
-      [username, email, password_hash, full_name || null],
-    );
-
-    const user = result.rows[0];
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    await pool.query(
-      "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)",
-      [user.id, refreshToken, expiresAt],
-    );
+    await RefreshToken.create({
+      user_id: user.id,
+      token: refreshToken,
+      expires_at: expiresAt,
+    });
 
     return sendSuccess(
       res,
@@ -73,17 +69,12 @@ const login = async (req, res, next) => {
 
     const { email, password } = req.body;
 
-    const result = await pool.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
-
-    if (result.rows.length === 0) {
+    const user = await User.findByEmail(email);
+    if (!user) {
       return sendError(res, "E-posta veya şifre hatalı", 401);
     }
 
-    const user = result.rows[0];
     const isMatch = await comparePassword(password, user.password_hash);
-
     if (!isMatch) {
       return sendError(res, "E-posta veya şifre hatalı", 401);
     }
@@ -94,10 +85,11 @@ const login = async (req, res, next) => {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    await pool.query(
-      "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)",
-      [user.id, refreshToken, expiresAt],
-    );
+    await RefreshToken.create({
+      user_id: user.id,
+      token: refreshToken,
+      expires_at: expiresAt,
+    });
 
     const { password_hash, ...userWithoutPassword } = user;
 
@@ -120,16 +112,19 @@ const refresh = async (req, res, next) => {
       return sendError(res, "Refresh token bulunamadı", 401);
     }
 
-    const tokenRecord = await pool.query(
-      "SELECT * FROM refresh_tokens WHERE token = $1 AND is_revoked = false",
-      [refreshToken],
-    );
+    const tokenRecord = await RefreshToken.findValid(refreshToken);
+    if (!tokenRecord) {
+      return sendError(res, "Geçersiz veya süresi dolmuş refresh token", 401);
+    }
 
-    if (tokenRecord.rows.length === 0) {
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch (err) {
+      await RefreshToken.revoke(refreshToken);
       return sendError(res, "Geçersiz refresh token", 401);
     }
 
-    const decoded = verifyRefreshToken(refreshToken);
     const accessToken = generateAccessToken(decoded.userId);
 
     return sendSuccess(res, { accessToken }, "Token yenilendi");
@@ -147,10 +142,7 @@ const logout = async (req, res, next) => {
       return sendError(res, "Refresh token bulunamadı", 400);
     }
 
-    await pool.query(
-      "UPDATE refresh_tokens SET is_revoked = true WHERE token = $1",
-      [refreshToken],
-    );
+    await RefreshToken.revoke(refreshToken);
 
     return sendSuccess(res, null, "Çıkış başarılı");
   } catch (err) {
@@ -161,16 +153,13 @@ const logout = async (req, res, next) => {
 // GET /api/auth/me
 const getMe = async (req, res, next) => {
   try {
-    const result = await pool.query(
-      "SELECT id, username, email, full_name, avatar_url, created_at FROM users WHERE id = $1",
-      [req.user.userId],
-    );
+    const user = await User.findById(req.user.userId);
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return sendError(res, "Kullanıcı bulunamadı", 404);
     }
 
-    return sendSuccess(res, result.rows[0]);
+    return sendSuccess(res, user);
   } catch (err) {
     next(err);
   }
@@ -186,15 +175,12 @@ const updateProfile = async (req, res, next) => {
 
     const { full_name, avatar_url } = req.body;
 
-    const result = await pool.query(
-      `UPDATE users SET full_name = COALESCE($1, full_name),
-                        avatar_url = COALESCE($2, avatar_url)
-       WHERE id = $3
-       RETURNING id, username, email, full_name, avatar_url`,
-      [full_name || null, avatar_url || null, req.user.userId],
-    );
+    const updatedUser = await User.updateProfile(req.user.userId, {
+      full_name,
+      avatar_url,
+    });
 
-    return sendSuccess(res, result.rows[0], "Profil güncellendi");
+    return sendSuccess(res, updatedUser, "Profil güncellendi");
   } catch (err) {
     next(err);
   }
@@ -210,31 +196,22 @@ const changePassword = async (req, res, next) => {
 
     const { current_password, new_password } = req.body;
 
-    const result = await pool.query(
-      "SELECT password_hash FROM users WHERE id = $1",
-      [req.user.userId],
+    // Şifreyi almak için doğrudan findByEmail değil özel sorgu kullanıyoruz
+    // çünkü findById password_hash döndürmüyor (güvenlik)
+    const user = await User.findByEmail(
+      (await User.findById(req.user.userId)).email,
     );
 
-    const isMatch = await comparePassword(
-      current_password,
-      result.rows[0].password_hash,
-    );
-
+    const isMatch = await comparePassword(current_password, user.password_hash);
     if (!isMatch) {
       return sendError(res, "Mevcut şifre hatalı", 401);
     }
 
     const newHash = await hashPassword(new_password);
+    await User.updatePassword(req.user.userId, newHash);
 
-    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [
-      newHash,
-      req.user.userId,
-    ]);
-
-    await pool.query(
-      "UPDATE refresh_tokens SET is_revoked = true WHERE user_id = $1",
-      [req.user.userId],
-    );
+    // Şifre değişince tüm refresh token'ları iptal et
+    await RefreshToken.revokeAllForUser(req.user.userId);
 
     return sendSuccess(res, null, "Şifre başarıyla değiştirildi");
   } catch (err) {

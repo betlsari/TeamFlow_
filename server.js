@@ -4,8 +4,10 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
-const passport = require("./src/config/passport"); // ✅ EKLENDİ
+const passport = require("./src/config/passport");
 const authRoutes = require("./src/routes/authRoutes");
+const notificationRoutes = require("./src/routes/notificationRoutes");
+const docsRoutes = require("./src/routes/docsRoutes");
 const errorHandler = require("./src/middleware/errorHandler");
 const requestLogger = require("./src/middleware/requestLogger");
 
@@ -18,13 +20,13 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Passport başlatma ✅ EKLENDİ
+// Passport başlatma
 app.use(passport.initialize());
 
 // Loglama
 app.use(requestLogger);
 
-// Rate limiting (auth endpoint'leri için)
+// Rate limiting (auth endpoint'leri için brute-force koruması)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
   max: 20,
@@ -33,6 +35,8 @@ const authLimiter = rateLimit({
 
 // Route'lar
 app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/docs", docsRoutes);
 
 // Sağlık kontrolü
 app.get("/health", (req, res) => {
