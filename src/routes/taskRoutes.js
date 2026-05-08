@@ -9,7 +9,10 @@ const {
   assigneeValidator,
 } = require("../validators/taskValidators");
 const { addLabelToTaskValidator } = require("../validators/labelValidators");
-
+const commentController = require("../controllers/commentController");
+const {createCommentValidator} = require("../validators/commentValidators");
+const attachmentController = require("../controllers/attachmentController");
+const upload = require("../config/multer");
 router.use(authMiddleware);
 
 router
@@ -32,20 +35,12 @@ router.delete("/:id/labels/:labelId", labelController.removeLabelFromTask);
 
 router
   .route("/:id/comments")
-  .get((req, res) => {
-    res.status(501).json({ success: false, message: "Henüz implemente edilmedi" });
-  })
-  .post((req, res) => {
-    res.status(501).json({ success: false, message: "Henüz implemente edilmedi" });
-  });
+  .get(commentController.getComments)
+  .post(createCommentValidator, commentController.createComment);
 
 router
   .route("/:id/attachments")
-  .get((req, res) => {
-    res.status(501).json({ success: false, message: "Henüz implemente edilmedi" });
-  })
-  .post((req, res) => {
-    res.status(501).json({ success: false, message: "Henüz implemente edilmedi" });
-  });
+  .get(attachmentController.getAttachments)
+  .post(upload.single("file"), attachmentController.uploadAttachment);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
+const sprintController = require("../controllers/sprintController");
 const {
   createSprintValidator,
   updateSprintValidator,
@@ -17,52 +18,22 @@ router.use(authMiddleware);
 // PUT    /api/sprints/:id   → Sprint güncelle
 router
   .route("/:id")
-  .get((req, res) => {
-    // TODO: Kişi C — sprintController.getSprint
-    res
-      .status(501)
-      .json({ success: false, message: "Henüz implemente edilmedi" });
-  })
-  .put(updateSprintValidator, (req, res) => {
-    // TODO: Kişi C — sprintController.updateSprint
-    res
-      .status(501)
-      .json({ success: false, message: "Henüz implemente edilmedi" });
-  });
+  .get(sprintController.getSprint)
+  .ğut(updateSprintValidator, sprintController.updateSprint);
 
 // ─── Sprint durum geçişleri ──────────────────────────────────
 // PATCH  /api/sprints/:id/start → Sprint başlat (status: planning → active)
-router.patch("/:id/start", (req, res) => {
-  // TODO: Kişi C — sprintController.startSprint
-  res
-    .status(501)
-    .json({ success: false, message: "Henüz implemente edilmedi" });
-});
+router.patch("/:id/start", sprintController.startSprint);
 
 // PATCH  /api/sprints/:id/end   → Sprint bitir (tamamlanmayanlar backlog'a)
-router.patch("/:id/end", (req, res) => {
-  // TODO: Kişi C — sprintController.endSprint
-  res
-    .status(501)
-    .json({ success: false, message: "Henüz implemente edilmedi" });
-});
+router.patch("/:id/end", sprintController.endSprint);
 
 // ─── Sprint görev yönetimi ───────────────────────────────────
 // POST   /api/sprints/:id/tasks/:taskId → Görevi sprint'e ekle
 // DELETE /api/sprints/:id/tasks/:taskId → Görevi sprint'ten çıkar
 router
   .route("/:id/tasks/:taskId")
-  .post((req, res) => {
-    // TODO: Kişi C — sprintController.addTaskToSprint
-    res
-      .status(501)
-      .json({ success: false, message: "Henüz implemente edilmedi" });
-  })
-  .delete((req, res) => {
-    // TODO: Kişi C — sprintController.removeTaskFromSprint
-    res
-      .status(501)
-      .json({ success: false, message: "Henüz implemente edilmedi" });
-  });
+  .post(sprintController.addTaskToSprint)
+  .delete(sprintController.removeTaskFromSprint);
 
 module.exports = router;

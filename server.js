@@ -15,6 +15,7 @@ const commentRoutes = require("./src/routes/commentRoutes");
 const docsRoutes = require("./src/routes/docsRoutes");
 const errorHandler = require("./src/middleware/errorHandler");
 const requestLogger = require("./src/middleware/requestLogger");
+const attachmentRoutes = require("./src/routes/attachmentRoutes");
 
 const app = express();
 
@@ -23,6 +24,8 @@ app.use(helmet());
 const corsOptions = require("./src/config/cors");
 app.use(cors(corsOptions));
 app.use(express.json());
+const path = require("path");
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.urlencoded({ extended: true }));
 
 // Passport başlatma
@@ -50,6 +53,7 @@ app.use("/api/labels", labelRoutes);
 // Kişi C route'ları
 app.use("/api/sprints", sprintRoutes);
 app.use("/api/comments", commentRoutes);
+app.use("/api/attachments", attachmentRoutes);
 
 // Swagger dokümantasyonu
 app.use("/api/docs", docsRoutes);

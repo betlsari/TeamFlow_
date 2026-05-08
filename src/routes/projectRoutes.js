@@ -16,7 +16,8 @@ const {
 const {
   createLabelValidator,
 } = require("../validators/labelValidators");
-
+const sprintController = require("../controllers/sprintController");
+const {createSprintValidator} = require("../validators/sprintValidators");
 router.use(authMiddleware);
 
 router
@@ -52,11 +53,7 @@ router
 
 router
   .route("/:id/sprints")
-  .get(rbac("owner", "contributor", "viewer"), (req, res) => {
-    res.status(501).json({ success: false, message: "Henüz implemente edilmedi" });
-  })
-  .post(rbac("owner", "contributor"), (req, res) => {
-    res.status(501).json({ success: false, message: "Henüz implemente edilmedi" });
-  });
+  .get(rbac("owner", "contributor", "viewer"), sprintController.getSprintsByProject)
+  .post(rbac("owner", "contributor"), createSprintValidator, sprintController.createSprint);
 
 module.exports = router;
