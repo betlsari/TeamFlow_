@@ -19,7 +19,7 @@ router.use(authMiddleware);
 router
   .route("/:id")
   .get(sprintController.getSprint)
-  .ğut(updateSprintValidator, sprintController.updateSprint);
+  .put(updateSprintValidator, sprintController.updateSprint);
 
 // ─── Sprint durum geçişleri ──────────────────────────────────
 // PATCH  /api/sprints/:id/start → Sprint başlat (status: planning → active)
