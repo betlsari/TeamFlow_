@@ -193,6 +193,7 @@ On error:
 }
 ```
 
-## License
 
-MIT
+## License  
+
+This project was developed as a university assignment. All rights reserved.
