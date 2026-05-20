@@ -1,161 +1,198 @@
-# TeamFlow — Mini Jira
+# MiniJira — Backend
 
-CENG316 Web Programming — Term Project  
-Sunum Tarihi: 21 Mayıs 2026
+A RESTful API for the MiniJira project management application, built with Node.js, Express, and PostgreSQL.
 
-TeamFlow, ekiplerin proje ve görevlerini birlikte yönetmesini sağlayan, Mini Jira benzeri bir web uygulamasıdır.
+## Tech Stack
 
----
+- **Runtime:** Node.js
+- **Framework:** Express.js
+- **Database:** PostgreSQL (via `pg` connection pool)
+- **Auth:** JWT (access token + refresh token rotation)
+- **Validation:** express-validator
+- **Password Hashing:** bcrypt
 
-## Teknolojiler
+## Features
 
-- **Backend:** Node.js, Express.js
-- **Veritabanı:** PostgreSQL
-- **Auth:** JWT (Access + Refresh Token), bcrypt
-- **Güvenlik:** Helmet, CORS, express-rate-limit
+- JWT-based authentication with refresh token rotation and revocation
+- Role-based access control (RBAC) — `owner`, `contributor`, `viewer`
+- Full project lifecycle: create, update, archive, delete
+- Task management with status (`todo`, `in_progress`, `done`) and priority (`low`, `medium`, `high`, `critical`)
+- Sprint management: planning → active → completed, with automatic backlog fallback
+- Nested comments (threaded replies) on tasks
+- File attachments per task
+- Label management per project
+- Activity log for project events
+- Project statistics endpoint
 
----
+## Project Structure
 
-## Kurulum
-
-### Gereksinimler
-
-- Node.js >= 18
-- PostgreSQL >= 14 (veya Docker)
-
-### 1. Repoyu klonla
-
-```bash
-git clone https://github.com/<kullanici>/teamflow-backend.git
-cd teamflow-backend
+```
+src/
+├── config/
+│   └── database.js          # PostgreSQL pool setup
+├── controllers/
+│   ├── authController.js
+│   ├── projectController.js
+│   ├── taskController.js
+│   ├── sprintController.js
+│   ├── labelController.js
+│   └── commentController.js
+├── middleware/
+│   ├── authMiddleware.js     # JWT verification
+│   └── rbacMiddleware.js     # Role-based access control
+├── models/
+│   ├── User.js
+│   ├── Project.js
+│   ├── Task.js
+│   ├── Sprint.js
+│   ├── Comment.js
+│   ├── Label.js
+│   ├── ProjectMember.js
+│   ├── RefreshToken.js
+│   └── ActivityLog.js
+├── routes/
+│   ├── authRoutes.js
+│   ├── projectRoutes.js
+│   ├── taskRoutes.js
+│   └── sprintRoutes.js
+├── utils/
+│   ├── jwtService.js
+│   ├── passwordHelper.js
+│   └── responseHelper.js
+└── validators/
+    ├── authValidators.js
+    ├── projectValidators.js
+    ├── taskValidators.js
+    ├── sprintValidators.js
+    └── labelValidators.js
 ```
 
-### 2. Bağımlılıkları yükle
+## API Endpoints
+
+### Auth
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register a new user |
+| POST | `/api/auth/login` | Login and receive tokens |
+| POST | `/api/auth/refresh` | Refresh access token |
+| POST | `/api/auth/logout` | Revoke refresh token |
+| PUT | `/api/auth/password` | Change password (revokes all refresh tokens) |
+
+### Projects
+| Method | Endpoint | Access |
+|--------|----------|--------|
+| GET | `/api/projects` | Authenticated |
+| POST | `/api/projects` | Authenticated |
+| GET | `/api/projects/:id` | owner / contributor / viewer |
+| PUT | `/api/projects/:id` | owner |
+| DELETE | `/api/projects/:id` | owner |
+| GET | `/api/projects/:id/statistics` | owner / contributor / viewer |
+| GET | `/api/projects/:id/activities` | owner / contributor / viewer |
+
+### Members
+| Method | Endpoint | Access |
+|--------|----------|--------|
+| GET | `/api/projects/:id/members` | owner / contributor / viewer |
+| POST | `/api/projects/:id/members` | owner |
+| DELETE | `/api/projects/:id/members/:userId` | owner |
+
+### Tasks
+| Method | Endpoint | Access |
+|--------|----------|--------|
+| GET | `/api/projects/:id/tasks` | owner / contributor / viewer |
+| POST | `/api/projects/:id/tasks` | owner / contributor |
+| GET | `/api/tasks/:id` | project member |
+| PUT | `/api/tasks/:id` | owner / contributor |
+| DELETE | `/api/tasks/:id` | owner / contributor |
+| PATCH | `/api/tasks/:id/status` | owner / contributor |
+
+### Sprints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/projects/:id/sprints` | List project sprints |
+| POST | `/api/projects/:id/sprints` | Create sprint |
+| GET | `/api/sprints/:id` | Sprint detail |
+| PUT | `/api/sprints/:id` | Update sprint |
+| PATCH | `/api/sprints/:id/start` | Start sprint (planning → active) |
+| PATCH | `/api/sprints/:id/end` | End sprint (unfinished tasks → backlog) |
+| POST | `/api/sprints/:id/tasks/:taskId` | Add task to sprint |
+| DELETE | `/api/sprints/:id/tasks/:taskId` | Remove task from sprint |
+
+### Labels
+| Method | Endpoint | Access |
+|--------|----------|--------|
+| GET | `/api/projects/:id/labels` | owner / contributor / viewer |
+| POST | `/api/projects/:id/labels` | owner / contributor |
+| DELETE | `/api/labels/:id` | owner / contributor |
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+
+### Installation
 
 ```bash
+git clone <repo-url>
+cd minijira-backend
 npm install
 ```
 
-### 3. Ortam değişkenlerini ayarla
+### Environment Variables
 
-```bash
-cp .env.example .env
+Create a `.env` file in the root directory:
+
+```env
+PORT=3000
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=minijira
+DB_USER=postgres
+DB_PASSWORD=your_password
+
+JWT_ACCESS_SECRET=your_access_secret
+JWT_REFRESH_SECRET=your_refresh_secret
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
 ```
 
-`.env` dosyasını açıp `DB_PASSWORD`, `JWT_SECRET` ve `REFRESH_SECRET` değerlerini güncelle.
-
-### 4a. PostgreSQL'i manuel kur (Docker kullanmıyorsan)
+### Run
 
 ```bash
-psql -U postgres -c "CREATE DATABASE teamflow;"
-psql -U postgres -d teamflow -f migrations/001_init_teamflow.sql
-```
-
-### 4b. Docker ile çalıştır (önerilen)
-
-```bash
-docker compose up -d
-```
-
-Bu komut PostgreSQL ve Node.js servislerini ayağa kaldırır.  
-Migration dosyası (`001_init_teamflow.sql`) ilk çalıştırmada otomatik uygulanır.
-
----
-
-## Çalıştırma
-
-```bash
-# Geliştirme (nodemon ile)
+# Development
 npm run dev
 
-# Prodüksiyon
+# Production
 npm start
 ```
 
-Sunucu varsayılan olarak `http://localhost:3000` adresinde çalışır.
+The API will be available at `http://localhost:3000`.
 
-Sağlık kontrolü:
+## Response Format
 
-```bash
-curl http://localhost:3000/health
+All endpoints return a consistent JSON structure:
+
+```json
+{
+  "success": true,
+  "message": "İşlem başarılı",
+  "data": { ... }
+}
 ```
 
----
+On error:
 
-## API Endpoint'leri
-
-### Auth
-
-| Method | Endpoint             | Açıklama                             |
-| ------ | -------------------- | ------------------------------------ |
-| POST   | `/api/auth/register` | Kullanıcı kaydı                      |
-| POST   | `/api/auth/login`    | Giriş — Access + Refresh Token döner |
-| POST   | `/api/auth/refresh`  | Yeni Access Token al                 |
-| POST   | `/api/auth/logout`   | Refresh Token'ı iptal et             |
-| GET    | `/api/auth/me`       | Oturumu açık kullanıcı bilgileri     |
-| PUT    | `/api/auth/profile`  | Profil güncelle                      |
-| PUT    | `/api/auth/password` | Şifre değiştir                       |
-
-> Auth gerektiren tüm isteklerde `Authorization: Bearer <access_token>` header'ı gönderilmeli.
-
----
-
-## Proje Yapısı
-
-```
-teamflow-backend/
-├── migrations/
-│   └── 001_init_teamflow.sql
-├── src/
-│   ├── config/
-│   │   ├── database.js
-│   │   ├── cors.js
-│   │   └── passport.js
-│   ├── controllers/
-│   │   └── authController.js
-│   ├── middleware/
-│   │   ├── authMiddleware.js
-│   │   ├── rbacMiddleware.js
-│   │   ├── errorHandler.js
-│   │   └── requestLogger.js
-│   ├── routes/
-│   │   └── authRoutes.js
-│   ├── utils/
-│   │   ├── jwtService.js
-│   │   ├── passwordHelper.js
-│   │   └── responseHelper.js
-│   └── validators/
-│       └── authValidators.js
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-├── package.json
-└── server.js
+```json
+{
+  "success": false,
+  "message": "Hata mesajı",
+  "errors": [ ... ]
+}
 ```
 
----
+## License
 
-## Ortam Değişkenleri
-
-| Değişken             | Açıklama                        | Örnek       |
-| -------------------- | ------------------------------- | ----------- |
-| `PORT`               | Sunucu portu                    | `3000`      |
-| `DB_HOST`            | PostgreSQL host                 | `localhost` |
-| `DB_PORT`            | PostgreSQL port                 | `5432`      |
-| `DB_NAME`            | Veritabanı adı                  | `teamflow`  |
-| `DB_USER`            | Veritabanı kullanıcısı          | `postgres`  |
-| `DB_PASSWORD`        | Veritabanı şifresi              | —           |
-| `JWT_SECRET`         | Access token imzalama anahtarı  | —           |
-| `JWT_EXPIRES_IN`     | Access token süresi             | `15m`       |
-| `REFRESH_SECRET`     | Refresh token imzalama anahtarı | —           |
-| `REFRESH_EXPIRES_IN` | Refresh token süresi            | `7d`        |
-
----
-
-## Ekip
-
-| Kişi   | Alan                               |
-| ------ | ---------------------------------- |
-| Kişi A | Domain + Infrastructure + Auth API |
-| Kişi B | Projects + Tasks + Labels API      |
-| Kişi C | Sprint + Comments + Frontend       |
+MIT
